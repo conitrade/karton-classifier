@@ -5,6 +5,7 @@ from unittest.mock import ANY, MagicMock
 from karton.core import Resource, Task
 from karton.core.test import KartonTestCase, ConfigMock, KartonBackendMock
 from karton.classifier import Classifier
+from .mock_helper import mock_classifier, mock_resource, mock_task
 
 
 class TestClassifier(KartonTestCase):
@@ -13,20 +14,10 @@ class TestClassifier(KartonTestCase):
         self.backend = KartonBackendMock()
 
     def test_process(self):
-        m = MagicMock()
-        m.side_effect = ["ASCII text", "text/plain"]
-        self.karton = Classifier(magic=m, config=self.config, backend=self.backend)
-
-        resource = Resource("file.txt", b"feeddecaf\n", sha256="sha256")
-        task = Task(
-            {
-                "type": "sample",
-                "kind": "raw",
-            }
-        )
-        task.add_payload("sample", resource)
-
-        res = self.run_task(task)
+        magic, mime = "ASCII text...", "text/plain"
+        self.karton = mock_classifier(magic, mime)
+        resource = mock_resource("file.txt")
+        res = self.run_task(mock_task(resource))
 
         expected = Task(
             headers={
@@ -35,31 +26,21 @@ class TestClassifier(KartonTestCase):
                 "origin": "karton.classifier",
                 "quality": "high",
                 "kind": "ascii",
-                "mime": "text/plain",
+                "mime": mime,
             },
             payload={
                 "sample": resource,
                 "tags": ["misc:ascii"],
-                "magic": "ASCII text",
+                "magic": magic,
             },
         )
         self.assertTasksEqual(res, [expected])
 
     def test_process_unknown(self):
-        m = MagicMock()
-        m.side_effect = ["", None]
-        self.karton = Classifier(magic=m, config=self.config, backend=self.backend)
-
-        resource = Resource("file", b"feeddecaf\n", sha256="sha256")
-        task = Task(
-            {
-                "type": "sample",
-                "kind": "raw",
-            }
-        )
-        task.add_payload("sample", resource)
-
-        res = self.run_task(task)
+        magic, mime = "", None
+        self.karton = mock_classifier(magic, mime)
+        resource = mock_resource("file")
+        res = self.run_task(mock_task(resource))
 
         expected = Task(
             headers={
@@ -80,16 +61,8 @@ class TestClassifier(KartonTestCase):
         m.side_effect = Exception("unknown error")
         self.karton = Classifier(magic=m, config=self.config, backend=self.backend)
 
-        resource = Resource("file.txt", b"feeddecaf\n", sha256="sha256")
-        task = Task(
-            {
-                "type": "sample",
-                "kind": "raw",
-            }
-        )
-        task.add_payload("sample", resource)
-
-        res = self.run_task(task)
+        resource = mock_resource("file.txt")
+        res = self.run_task(mock_task(resource))
 
         expected = Task(
             headers={
